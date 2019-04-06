@@ -32,8 +32,6 @@ unsigned long currcode;
 unsigned long prevcode;
 static unsigned long lastAmpTime;
 static unsigned long AMPinterval = 4000;
-//static bool AMPtimeout = true;
-//unsigned long now = millis();
 
 //unsigned long REPEAT = 0xFFFFFFFF;
 //uint64_t NEC_REPEAT = 0xFFFFFFFFFFFFFFFF;
