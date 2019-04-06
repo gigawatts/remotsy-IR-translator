@@ -11,13 +11,17 @@
 #include <IRrecv.h>
 #include <IRutils.h>
 
-//#define NEOPIXEL
+//#define SERIAL_ENABLE
+//#define NEOPIXEL_ENABLE  // Enables Neopixel stuff
+//#define NEOPIXEL_DEBUG   // Enables Neopixel flashes with IR activity
+//#define NEOPIXEL_TIMEOUT // Enables LED Amp timeout indicator
 
-#ifdef NEOPIXEL
+#ifdef NEOPIXEL_ENABLE
   #include <Adafruit_NeoPixel.h>
   Adafruit_NeoPixel LED = Adafruit_NeoPixel(1, 14, NEO_GRB + NEO_KHZ800);
   uint32_t LED_ON = 0x000005;
   uint32_t LED_REPEAT = 0x050000;
+  uint32_t LED_TIMEOUT = 0x050500;
 #endif
 
 const int RECV_PIN = 5;
@@ -26,6 +30,10 @@ int repeat = 2;
 
 unsigned long currcode;
 unsigned long prevcode;
+static unsigned long lastAmpTime;
+static unsigned long AMPinterval = 4000;
+//static bool AMPtimeout = true;
+//unsigned long now = millis();
 
 //unsigned long REPEAT = 0xFFFFFFFF;
 //uint64_t NEC_REPEAT = 0xFFFFFFFFFFFFFFFF;
@@ -61,16 +69,18 @@ void setup()
 {
   WiFi.mode( WIFI_OFF );
   WiFi.forceSleepBegin();
-  //Serial.begin(9600);
-  Serial.begin(115200);
+  #ifdef SERIAL_ENABLE
+    //Serial.begin(9600);
+    Serial.begin(115200);
+    Serial.println("");
+    Serial.println("ESP8266 Infrared Traslator");
+  #endif
   irrecv.enableIRIn();
   irsend.begin();
-  #ifdef NEOPIXEL
+  #ifdef NEOPIXEL_ENABLE
     LED.begin();
   #endif
   //irrecv.blink13(true);
-  Serial.println("");
-  Serial.println("ESP8266 Infrared Traslator");
 }
 
 void dump(decode_results *results) {
@@ -121,6 +131,17 @@ void dump(decode_results *results) {
   } //END dump
 
 void loop() {
+  unsigned long now = millis();
+  if (repeat == 1 && now - lastAmpTime >= AMPinterval) {
+    #ifdef SERIAL_ENABLE
+      Serial.println("AMP Timeout");
+    #endif
+    repeat = 2;
+      #ifdef NEOPIXEL_TIMEOUT
+        LED.setPixelColor(0, 0); LED.show();
+      #endif
+  }
+
   if (irrecv.decode(&results)) {
     if (results.decode_type != UNKNOWN ) {
       if (!results.repeat) {
@@ -131,78 +152,104 @@ void loop() {
 
       if (currcode == TVmute || currcode == AMPmute)
       {
-        #ifdef NEOPIXEL
-          LED.setPixelColor(0, LED_ON); LED.show();
+        #ifdef SERIAL_ENABLE
+          if (currcode == TVmute) Serial.print("Received TVmute, ");
+          if (currcode == AMPmute) Serial.print("Received AMPmute, ");
+          Serial.println("Sending Amplifier Volume Mute");
         #endif
-        Serial.println("Sending Amplifier Volume Mute");
         irsend.sendNEC(AMPmute, 32);
         //irsend.sendRaw(AMPrawMute,68,38000);
+        #ifdef NEOPIXEL_DEBUG
+          LED.setPixelColor(0, LED_ON); LED.show();
+        #endif
         delay(50);
-        #ifdef NEOPIXEL
+        #ifdef NEOPIXEL_DEBUG
           LED.setPixelColor(0, 0); LED.show();
         #endif
       }
+      
       else if (currcode == TVvolup || currcode == AMPvolup)
       {
-        Serial.println("Sending Amplifier Volume Up");
+        #ifdef SERIAL_ENABLE
+          if (currcode == TVvolup) Serial.print("Received TVvolup, ");
+          if (currcode == AMPvolup) Serial.print("Received AMPvolup, ");
+          Serial.print("Sending Amplifier Volume Up, ");
+          Serial.print("Repeat: "); Serial.println(repeat);
+        #endif
         for (int i = 0; i < repeat; i++)
         {
-          #ifdef NEOPIXEL
+          irsend.sendNEC(AMPvolup, 32);
+          #ifdef NEOPIXEL_DEBUG
             LED.setPixelColor(0, LED_ON); LED.show();
           #endif
-          irsend.sendNEC(AMPvolup, 32);
           delay(50);
-          #ifdef NEOPIXEL
+          #ifdef NEOPIXEL_DEBUG
             LED.setPixelColor(0, 0); LED.show();
           #endif
         }
       }
+      
       else if (currcode == TVvoldown || currcode == AMPvoldown)
       {
-        Serial.println("Sending Amplifier Volume Down");
+        #ifdef SERIAL_ENABLE
+          if (currcode == TVvoldown) Serial.print("Received TVvoldown, ");
+          if (currcode == AMPvoldown) Serial.print("Received AMPvoldown, ");
+          Serial.print("Sending Amplifier Volume Down");
+          Serial.print("Repeat: "); Serial.println(repeat);
+        #endif
         for (int i = 0; i < repeat; i++)
         {
-          #ifdef NEOPIXEL
+          irsend.sendNEC(AMPvoldown, 32);
+          #ifdef NEOPIXEL_DEBUG
             LED.setPixelColor(0, LED_ON); LED.show();
           #endif
-          irsend.sendNEC(AMPvoldown, 32);
           delay(50);
-          #ifdef NEOPIXEL
+          #ifdef NEOPIXEL_DEBUG
             LED.setPixelColor(0, 0); LED.show();
           #endif
         }
       }
+      
       else if (currcode == TVred || currcode == AMPpoweroff)
       {
-        Serial.println("Sending Amplifier Power Off");
-        for (int i = 0; i < repeat; i++)
-        {
-          #ifdef NEOPIXEL
-            LED.setPixelColor(0, LED_ON); LED.show();
-          #endif
-          irsend.sendNEC(AMPpoweroff, 32);
-          delay(50);
-          #ifdef NEOPIXEL
-            LED.setPixelColor(0, 0); LED.show();
-          #endif
-        }
-      }
-      else if (currcode == TVgreen || currcode == AMPpoweron)
-      {
-        Serial.println("Sending Amplifier Power On");
-        #ifdef NEOPIXEL
+        #ifdef SERIAL_ENABLE
+          if (currcode == TVred) Serial.print("Received TVred, ");
+          if (currcode == AMPpoweroff) Serial.print("Received AMPpoweroff, ");
+          Serial.println("Sending Amplifier Power Off");
+        #endif
+        irsend.sendNEC(AMPpoweroff, 32);
+        #ifdef NEOPIXEL_DEBUG
           LED.setPixelColor(0, LED_ON); LED.show();
         #endif
-        irsend.sendNEC(AMPpoweron, 32);
         delay(50);
-        #ifdef NEOPIXEL
+        #ifdef NEOPIXEL_DEBUG
+          LED.setPixelColor(0, 0); LED.show();
+        #endif
+      }
+      
+      else if (currcode == TVgreen || currcode == AMPpoweron)
+      {
+        #ifdef SERIAL_ENABLE
+          if (currcode == TVgreen) Serial.print("Received TVgreen, ");
+          if (currcode == AMPpoweron) Serial.print("Received AMPpoweron, ");
+          Serial.println("Sending Amplifier Power On");
+        #endif
+        irsend.sendNEC(AMPpoweron, 32);
+        #ifdef NEOPIXEL_DEBUG
+          LED.setPixelColor(0, LED_ON); LED.show();
+        #endif
+        delay(50);
+        #ifdef NEOPIXEL_DEBUG
           LED.setPixelColor(0, 0); LED.show();
         #endif
       }
       else if (currcode == 0)
       {
-        Serial.println("Decoded Repeat");
-        #ifdef NEOPIXEL
+        #ifdef SERIAL_ENABLE
+          Serial.println("Received Repeat");
+        #endif
+        // TODO: Send last code received?
+        #ifdef NEOPIXEL_DEBUG
           LED.setPixelColor(0, LED_REPEAT); LED.show();
           delay(50);
           LED.setPixelColor(0, 0); LED.show();
@@ -210,13 +257,25 @@ void loop() {
       }
       else
       {
-        //do nothing
-        dump(&results);
+        // do nothing
+        #ifdef SERIAL_ENABLE
+          dump(&results);
+        #endif
       }
-    }
+      
+    } // END Decode results not unknown
+    
+    if (currcode == TVvolup || currcode == TVvoldown) {
+        lastAmpTime = now;
+        repeat = 1;
+        #ifdef NEOPIXEL_TIMEOUT
+          LED.setPixelColor(0, LED_TIMEOUT); LED.show();
+        #endif
+      }
     prevcode = currcode;
     irrecv.resume();
     irrecv.enableIRIn(); //trust me this has to be done again
-  }
+
+  } // END IR decode results
 
 } // END loop
