@@ -31,7 +31,7 @@ int repeat = 2;
 unsigned long currcode;
 unsigned long prevcode;
 static unsigned long lastAmpTime;
-static unsigned long AMPinterval = 4000;
+static unsigned long AMPtimeout = 4000;
 
 //unsigned long REPEAT = 0xFFFFFFFF;
 //uint64_t NEC_REPEAT = 0xFFFFFFFFFFFFFFFF;
@@ -130,7 +130,7 @@ void dump(decode_results *results) {
 
 void loop() {
   unsigned long now = millis();
-  if (repeat == 1 && now - lastAmpTime >= AMPinterval) {
+  if (repeat == 1 && now - lastAmpTime >= AMPtimeout) {
     #ifdef SERIAL_ENABLE
       Serial.println("AMP Timeout");
     #endif
@@ -263,7 +263,7 @@ void loop() {
       
     } // END Decode results not unknown
     
-    if (currcode == TVvolup || currcode == TVvoldown) {
+    if (currcode == TVvolup || currcode == TVvoldown || currcode == AMPvolup || currcode == AMPvoldown) {
         lastAmpTime = now;
         repeat = 1;
         #ifdef NEOPIXEL_TIMEOUT
